@@ -1,59 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>PocketSmart-AI 💰</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PocketSmart-AI</title>
 <style>
-body{font-family:Arial;max-width:600px;margin:auto;padding:20px;background:#f5f7ff}
+body{font-family:Arial;max-width:600px;margin:30px auto;background:#f5f7ff;padding:20px}
+h1{color:#2563eb;text-align:center}
 .card{background:white;padding:20px;border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1);margin-bottom:20px}
-input,button{padding:12px;width:100%;margin:8px 0;border-radius:8px;border:1px solid #ddd;box-sizing:border-box}
-button{background:#6c5cff;color:white;border:none;font-weight:bold;cursor:pointer}
-button:hover{background:#5848e0}
-.expense{border-bottom:1px solid #eee;padding:10px 0;display:flex;justify-content:space-between}
-h1{color:#6c5cff;text-align:center}
+input{width:95%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px}
+button{background:#2563eb;color:white;border:none;padding:12px;width:100%;border-radius:8px;font-weight:bold;cursor:pointer}
+.item{background:#f1f5ff;padding:10px;margin:8px 0;border-radius:8px;display:flex;justify-content:space-between}
 </style>
 </head>
 <body>
 <h1>💰 PocketSmart-AI</h1>
 <p style="text-align:center">Your Smart Expense Tracker</p>
+
 <div class="card">
 <h3>Add Expense</h3>
 <input id="title" placeholder="Ex: Tea, Bus fare">
 <input id="amount" type="number" placeholder="Amount ₹">
-<input id="category" placeholder="Category - food, travel">
-<button onclick="addExpense()">Add Expense</button>
+<input id="category" placeholder="Category - Food, Travel" value="Food">
+<button onclick="addExp()">Add Expense</button>
 </div>
+
 <div class="card">
-<h3>Your Expenses <button onclick="loadExpenses()" style="width:auto;padding:5px 10px;float:right">Refresh</button></h3>
-<div id="list">Loading...</div>
-<h3 id="total" style="margin-top:15px;color:#6c5cff"></h3>
+<h3>Your Expenses <button onclick="loadExp()" style="width:auto;float:right;padding:5px 10px">Refresh</button></h3>
+<div id="list">No expenses yet. Add one!</div>
+<h3 id="total" style="color:#2563eb">Total: ₹0</h3>
 </div>
+
 <script>
-async function loadExpenses(){
-  let res = await fetch('/api/expenses');
-  let data = await res.json();
-  let list = document.getElementById('list');
-  let total=0;
-  if(data.length==0){list.innerHTML='No expenses yet. Add one!';}
-  else{
-    list.innerHTML='';
-    data.reverse().forEach(e=>{
-      total+=e.amount;
-      list.innerHTML+=`<div class="expense"><span><b>${e.title}</b> <small>(${e.category})</small></span><span>₹${e.amount}</span></div>`;
-    });
-  }
-  document.getElementById('total').innerText='Total: ₹'+total;
+let exps = JSON.parse(localStorage.getItem('exps') || '[]');
+
+async function addExp(){
+ let t=document.getElementById('title').value;
+ let a=document.getElementById('amount').value;
+ let c=document.getElementById('category').value;
+ if(!t || !a){alert('Title and Amount podu da!');return}
+ let data={title:t,amount:parseFloat(a),category:c,date:new Date().toLocaleDateString()};
+ 
+ // save local
+ exps.push(data);
+ localStorage.setItem('exps',JSON.stringify(exps));
+ 
+ // try backend also
+ try{await fetch('/api/expenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}catch(e){}
+ 
+ document.getElementById('title').value='';
+ document.getElementById('amount').value='';
+ show();
 }
-async function addExpense(){
-  let title=document.getElementById('title').value;
-  let amount=parseFloat(document.getElementById('amount').value);
-  let category=document.getElementById('category').value||'general';
-  if(!title||!amount){alert('Title and Amount needed da!');return;}
-  await fetch('/api/expenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,amount,category})});
-  document.getElementById('title').value='';document.getElementById('amount').value='';
-  loadExpenses();
+
+function show(){
+ let list=document.getElementById('list');
+ let tot=0;
+ if(exps.length==0){list.innerHTML='No expenses yet. Add one!';}
+ else{
+  list.innerHTML='';
+  exps.forEach(e=>{
+   tot+=e.amount;
+   list.innerHTML+=`<div class="item"><span><b>${e.title}</b> - ${e.category}</span><span>₹${e.amount}</span></div>`;
+  });
+ }
+ document.getElementById('total').innerText='Total: ₹'+tot;
 }
-loadExpenses();
+function loadExp(){show()}
+show();
 </script>
 </body>
 </html>
