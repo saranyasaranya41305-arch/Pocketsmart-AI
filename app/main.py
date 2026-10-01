@@ -1,64 +1,49 @@
 from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlmodel import SQLModel, Field, create_engine, Session, select
-from typing import Optional
-from datetime import datetime
+from fastapi.responses import HTMLResponse
 from pathlib import Path
+import os
 
-app = FastAPI(title="PocketSmartAI")
+app = FastAPI()
 
-# DB
-engine = create_engine("sqlite:///./app.db")
+# Find templates - try all possible places
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
 
-class Expense(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    title: str
-    amount: float
-    category: str = "general"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+possible_paths = [
+    ROOT_DIR / "templates",
+    BASE_DIR / "templates", 
+    Path("templates"),
+    Path("app/templates")
+]
 
-def init_db():
-    SQLModel.metadata.create_all(engine)
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-
-# FIX: find templates folder correctly
-BASE_DIR = Path(__file__).resolve().parent.parent
-POSSIBLE_TEMPLATE_DIRS = [BASE_DIR / "templates", Path("templates"), Path("app/templates"), BASE_DIR / "app" / "templates"]
-
-templates = None
-for t_dir in POSSIBLE_TEMPLATE_DIRS:
-    if t_dir.exists():
-        templates = Jinja2Templates(directory=str(t_dir))
-        print(f"Templates found at: {t_dir}")
+templates_dir = None
+for p in possible_paths:
+    if p.exists() and (p / "index.html").exists():
+        templates_dir = p
+        print(f"FOUND TEMPLATES AT: {p}")
         break
 
-@app.get("/")
-def home(request: Request):
+if templates_dir:
+    templates = Jinja2Templates(directory=str(templates_dir))
+else:
+    templates = None
+    print("TEMPLATES NOT FOUND! Checked:", possible_paths)
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
     if templates:
         try:
             return templates.TemplateResponse("index.html", {"request": request})
         except Exception as e:
-            print(f"Template error: {e}")
-    return {"message": "PocketSmartAI Running", "status": "API is live!", "docs": "/docs"}
+            print(f"TEMPLATE ERROR: {e}")
+            return HTMLResponse(f"<h1>Error: {e}</h1><p>Templates dir: {templates_dir}</p>", status_code=500)
+    return {"message": "PocketSmartAI Running", "status": "API is live!", "docs": "/docs", "templates_dir": str(templates_dir), "checked": [str(p) for p in possible_paths]}
 
 @app.get("/api/expenses")
-def get_expenses():
-    with Session(engine) as session:
-        expenses = session.exec(select(Expense)).all()
-        return expenses
+async def get_expenses():
+    return []
 
 @app.post("/api/expenses")
-def add_expense(expense: Expense):
-    with Session(engine) as session:
-        session.add(expense)
-        session.commit()
-        session.refresh(expense)
-        return expense
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "app": "PocketSmartAI"}
+async def add_expense(data: dict):
+    return data
